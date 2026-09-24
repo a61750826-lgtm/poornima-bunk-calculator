@@ -135,7 +135,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     setState(() => _isLoading = true);
     final scraped = await ScraperService.fetchAttendance();
     setState(() {
-      _report = scraped ?? _fallbackReport;
+      if (scraped != null && scraped.overallTotal > 0) {
+        _report = scraped;
+      } else {
+        _report = _fallbackReport;
+      }
       _isLoading = false;
     });
   }
@@ -145,7 +149,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     HapticFeedback.mediumImpact();
     final scraped = await ScraperService.fetchAttendance();
     setState(() {
-      _report = scraped ?? _report;
+      if (scraped != null && scraped.overallTotal > 0) {
+        _report = scraped;
+      }
       _isSyncing = false;
     });
     HapticFeedback.lightImpact();

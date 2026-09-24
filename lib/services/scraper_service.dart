@@ -117,6 +117,11 @@ class ScraperService {
         bunkAdvice = 'You must attend the next $need consecutive class(es) to cross 75%.';
       }
 
+      // If no subjects matched, parsing failed (e.g. redirected to login or portal changed structure)
+      if (subjects.isEmpty) {
+        return null;
+      }
+
       final now = DateTime.now();
       final dateStr = '${now.day}-${_monthName(now.month)}-${now.year}';
 
