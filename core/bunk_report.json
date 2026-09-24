@@ -1,0 +1,211 @@
+{
+  "app_name": "Poornima Bunk Calculator",
+  "developer": "Crafted with precision by Gourav Singh (cyber)",
+  "student_name": "Gaurav",
+  "program": "B. Tech. (CY) PCE (Semester 1)",
+  "overall_total": 72,
+  "overall_present": 69,
+  "overall_absent": 3,
+  "overall_percentage": 95.83,
+  "total_safe_bunks": 20,
+  "bunk_advice": "You can safely miss up to 20 class(es) and remain comfortably above 75%.",
+  "is_tcs_down": false,
+  "last_synced_at": "2026-09-24 23:25:00",
+  "date": "24-September-2026",
+  "subjects": [
+    {
+      "code": "NSP001",
+      "name": "Non Syllabus Project",
+      "total": 6,
+      "present": 6,
+      "absent": 0,
+      "percentage": 100,
+      "safe_bunks": 2,
+      "need_to_attend": 0
+    },
+    {
+      "code": "PC261FY103",
+      "name": "Engineering Mathematics-I",
+      "total": 12,
+      "present": 12,
+      "absent": 0,
+      "percentage": 100,
+      "safe_bunks": 4,
+      "need_to_attend": 0
+    },
+    {
+      "code": "PC261CY104",
+      "name": "Basic Electrical & Electronics Engg",
+      "total": 9,
+      "present": 7,
+      "absent": 2,
+      "percentage": 77.78,
+      "safe_bunks": 0,
+      "need_to_attend": 0
+    },
+    {
+      "code": "PC261FY102",
+      "name": "Engineering Physics",
+      "total": 6,
+      "present": 5,
+      "absent": 1,
+      "percentage": 83.33,
+      "safe_bunks": 0,
+      "need_to_attend": 0
+    },
+    {
+      "code": "PC261FY106",
+      "name": "Programming with C",
+      "total": 3,
+      "present": 3,
+      "absent": 0,
+      "percentage": 100,
+      "safe_bunks": 1,
+      "need_to_attend": 0
+    },
+    {
+      "code": "PC261FY405",
+      "name": "Human Values and Ethics",
+      "total": 10,
+      "present": 10,
+      "absent": 0,
+      "percentage": 100,
+      "safe_bunks": 3,
+      "need_to_attend": 0
+    },
+    {
+      "code": "PC261CY124",
+      "name": "Web Programming Lab",
+      "total": 6,
+      "present": 6,
+      "absent": 0,
+      "percentage": 100,
+      "safe_bunks": 2,
+      "need_to_attend": 0
+    },
+    {
+      "code": "PC261FY122",
+      "name": "Engineering Physics Lab",
+      "total": 4,
+      "present": 4,
+      "absent": 0,
+      "percentage": 100,
+      "safe_bunks": 1,
+      "need_to_attend": 0
+    },
+    {
+      "code": "PC261FY123",
+      "name": "Programming with C Lab",
+      "total": 2,
+      "present": 2,
+      "absent": 0,
+      "percentage": 100,
+      "safe_bunks": 0,
+      "need_to_attend": 0
+    },
+    {
+      "code": "PC261FY526",
+      "name": "Language Lab*",
+      "total": 6,
+      "present": 6,
+      "absent": 0,
+      "percentage": 100,
+      "safe_bunks": 2,
+      "need_to_attend": 0
+    },
+    {
+      "code": "PC261FY628",
+      "name": "IDEA Lab Workshop",
+      "total": 2,
+      "present": 2,
+      "absent": 0,
+      "percentage": 100,
+      "safe_bunks": 0,
+      "need_to_attend": 0
+    },
+    {
+      "code": "PC261FY629",
+      "name": "Manufacturing Practices Workshop",
+      "total": 6,
+      "present": 6,
+      "absent": 0,
+      "percentage": 100,
+      "safe_bunks": 2,
+      "need_to_attend": 0
+    }
+  ],
+  "today_schedule": [
+    {
+      "subject": "Human Values and Ethics",
+      "time_slot": "08:00-09:00",
+      "status": "Present"
+    },
+    {
+      "subject": "Basic Electrical & Electronics Engg",
+      "time_slot": "09:00-10:00",
+      "status": "Present"
+    },
+    {
+      "subject": "Engineering Mathematics-I",
+      "time_slot": "10:00-11:00",
+      "status": "Present"
+    },
+    {
+      "subject": "Human Values and Ethics",
+      "time_slot": "11:00-12:00",
+      "status": "Present"
+    },
+    {
+      "subject": "Web Programming Lab",
+      "time_slot": "12:50-13:50",
+      "status": "Present"
+    },
+    {
+      "subject": "Web Programming Lab",
+      "time_slot": "13:50-14:50",
+      "status": "Present"
+    }
+  ],
+  "scheduled_triggers": [
+    {
+      "type": "MORNING_DIGEST",
+      "trigger_time": "07:30",
+      "desc": "Morning brief: Today's lectures and safe bunk wallet balance"
+    },
+    {
+      "type": "POST_CLASS_PROBE",
+      "trigger_time": "09:10",
+      "desc": "Probe attendance 10 min after Human Values and Ethics (08:00-09:00)"
+    },
+    {
+      "type": "POST_CLASS_PROBE",
+      "trigger_time": "10:10",
+      "desc": "Probe attendance 10 min after Basic Electrical & Electronics Engg (09:00-10:00)"
+    },
+    {
+      "type": "POST_CLASS_PROBE",
+      "trigger_time": "11:10",
+      "desc": "Probe attendance 10 min after Engineering Mathematics-I (10:00-11:00)"
+    },
+    {
+      "type": "POST_CLASS_PROBE",
+      "trigger_time": "12:10",
+      "desc": "Probe attendance 10 min after Human Values and Ethics (11:00-12:00)"
+    },
+    {
+      "type": "POST_CLASS_PROBE",
+      "trigger_time": "14:00",
+      "desc": "Probe attendance 10 min after Web Programming Lab (12:50-13:50)"
+    },
+    {
+      "type": "POST_CLASS_PROBE",
+      "trigger_time": "15:00",
+      "desc": "Probe attendance 10 min after Web Programming Lab (13:50-14:50)"
+    },
+    {
+      "type": "NIGHT_HIBERNATE",
+      "trigger_time": "17:00",
+      "desc": "College hours finished. Hibernate all triggers until next 7:30 AM."
+    }
+  ]
+}
