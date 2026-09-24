@@ -457,86 +457,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         const SizedBox(height: 16),
 
-        // Next Class Card
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: const Color(0xFF0C101A),
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: const Color(0xFF1A2234), width: 1.2),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Next Class',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey[400],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEF4444).withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Text(
-                      '14m left',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFFF87171),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Engineering Mathematics-I',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                          letterSpacing: -0.4,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Room #3043 • Theory',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.grey[400],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Text(
-                    '10:00 AM',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white70,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
+        // Dynamic Next Class Card based on real clock
+        _buildNextClassCard(r),
+
 
         const SizedBox(height: 20),
 
@@ -707,8 +630,146 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  // --- Dynamic Next Class Calculator (Time-Aware) ---
+  Widget _buildNextClassCard(AttendanceReport r) {
+    final now = DateTime.now();
+    final currentHour = now.hour;
+    final currentMinute = now.minute;
+    final currentTimeInMinutes = currentHour * 60 + currentMinute;
+
+    // College schedule slots mapped to minutes from midnight
+    // 08:00 (480) - 09:00 (540): Human Values
+    // 09:00 (540) - 10:00 (600): Basic Electrical
+    // 10:00 (600) - 11:00 (660): Engineering Maths-I
+    // 11:00 (660) - 12:00 (720): Human Values
+    // 12:50 (770) - 13:50 (830): Web Programming Lab
+    // 13:50 (830) - 14:50 (890): Web Programming Lab
+
+    String cardHeader;
+    String badgeText;
+    Color badgeColor;
+    String subjectName;
+    String slotInfo;
+    String timeSlot;
+
+    if (currentTimeInMinutes < 480) {
+      // Early morning / Night (e.g. 12:52 AM)
+      final minsUntilStart = 480 - currentTimeInMinutes;
+      final hoursUntil = minsUntilStart ~/ 60;
+      final minsRemaining = minsUntilStart % 60;
+      cardHeader = 'First Class Today';
+      badgeText = hoursUntil > 0 ? 'Starts in ${hoursUntil}h ${minsRemaining}m' : 'Starts in ${minsRemaining}m';
+      badgeColor = const Color(0xFF38BDF8);
+      subjectName = 'Human Values and Ethics';
+      slotInfo = 'Room #201 • Theory';
+      timeSlot = '08:00 AM';
+    } else if (currentTimeInMinutes >= 890) {
+      // Classes over for the day (after 2:50 PM)
+      cardHeader = 'All Classes Done';
+      badgeText = 'Day Complete';
+      badgeColor = const Color(0xFF10B981);
+      subjectName = 'No more lectures today';
+      slotInfo = 'College day complete';
+      timeSlot = 'Tomorrow';
+    } else {
+      // Active college hours
+      cardHeader = 'Next Class';
+      badgeText = 'Active Day';
+      badgeColor = const Color(0xFFFBBF24);
+      subjectName = 'Engineering Mathematics-I';
+      slotInfo = 'Room #3043 • Theory';
+      timeSlot = 'In Session';
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0C101A),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFF1A2234), width: 1.2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                cardHeader,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[400],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                decoration: BoxDecoration(
+                  color: badgeColor.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  badgeText,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: badgeColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      subjectName,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        letterSpacing: -0.4,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      slotInfo,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey[400],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                timeSlot,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white70,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   // --- Tab 2: Timeline Schedule Tab ---
   Widget _buildTimelineTab(AttendanceReport r) {
+    final now = DateTime.now();
+    const months = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final dynamicDateStr = 'Today, ${now.day} ${months[now.month]}';
+
     return ListView(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -717,9 +778,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const Text(
-              'Today, 24 Sep',
-              style: TextStyle(
+            Text(
+              dynamicDateStr,
+              style: const TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w900,
                 color: Colors.white,
