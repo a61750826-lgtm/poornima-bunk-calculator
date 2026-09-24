@@ -306,21 +306,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // --- Tab 1: Overview Tab (Mockup 1) ---
+  // --- Tab 1: Overview Tab (With Fixed Layout & Live Dynamic Math) ---
   Widget _buildOverviewTab(AttendanceReport r) {
+    // Dynamic recalculation driven by the sliders
+    int extraBunksSum = 0;
+    for (final v in _simulatedBunks.values) {
+      extraBunksSum += v;
+    }
+
+    final simTotalLectures = r.overallTotal + extraBunksSum;
+    final simPresentLectures = r.overallPresent;
+    final liveMasterPct = simTotalLectures > 0
+        ? double.parse(((simPresentLectures / simTotalLectures) * 100).toStringAsFixed(1))
+        : 0.0;
+    final liveSafeBunksRemaining = max(0, r.totalSafeBunks - extraBunksSum);
+    final isMasterSafe = liveMasterPct >= 75.0;
+
     return ListView(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       children: [
         const SizedBox(height: 10),
 
-        // Hero Circular Gauge Container
+        // Hero Card: Dedicated Non-Clipping Layout
         Container(
-          height: 320,
+          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
           decoration: BoxDecoration(
             color: const Color(0xFF0C101A),
             borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: const Color(0xFF1A2234), width: 1.2),
+            border: Border.all(
+              color: isMasterSafe ? const Color(0xFF1A2234) : const Color(0xFFEF4444).withOpacity(0.5),
+              width: 1.2,
+            ),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.5),
@@ -329,103 +346,110 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ],
           ),
-          child: Stack(
-            alignment: Alignment.center,
+          child: Column(
             children: [
-              // Radial Progress Ring
-              CustomPaint(
-                size: const Size(220, 220),
-                painter: _RadialGaugePainter(percentage: r.overallPercentage),
-              ),
-
-              // Percentage Text inside Ring
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '${r.overallPercentage}%',
-                    style: const TextStyle(
-                      fontSize: 48,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                      letterSpacing: -1.5,
+              // Clean Centered Radial Progress Ring (No crop, full stroke clearance)
+              SizedBox(
+                width: 210,
+                height: 210,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    CustomPaint(
+                      size: const Size(210, 210),
+                      painter: _RadialGaugePainter(percentage: liveMasterPct),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${r.overallPresent}/${r.overallTotal} Lectures',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey[400],
-                    ),
-                  ),
-                ],
-              ),
-
-              // Floating Bunk Wallet Pill (As seen in generated image)
-              Positioned(
-                right: 18,
-                bottom: 22,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF131A2B),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFF26334D), width: 1),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.4),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      )
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Bunk Wallet',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.grey[400],
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '${liveMasterPct.toStringAsFixed(1)}%',
+                          style: TextStyle(
+                            fontSize: 44,
+                            fontWeight: FontWeight.w900,
+                            color: isMasterSafe ? Colors.white : const Color(0xFFEF4444),
+                            letterSpacing: -1.5,
+                          ),
                         ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '$simPresentLectures / $simTotalLectures Lectures',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[400],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Embedded Dual Stat Bar: Lectures + Live Dynamic Bunk Wallet
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF131A2B),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFF26334D)),
                       ),
-                      const SizedBox(height: 3),
-                      Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          Text('STATUS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.grey[400])),
+                          const SizedBox(height: 4),
                           Text(
-                            '+${r.totalSafeBunks}',
+                            isMasterSafe ? 'SAFE' : 'CRITICAL',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
+                              color: isMasterSafe ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text('Above 75% goal', style: TextStyle(fontSize: 10, color: Colors.grey[400])),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF131A2B),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFF26334D)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('BUNK WALLET', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.grey[400])),
+                          const SizedBox(height: 4),
+                          Text(
+                            '+$liveSafeBunksRemaining Safe',
                             style: const TextStyle(
-                              fontSize: 15,
+                              fontSize: 14,
                               fontWeight: FontWeight.w900,
                               color: Color(0xFF10B981),
                             ),
                           ),
-                          const SizedBox(width: 4),
-                          const Text(
-                            'Safe Bunks',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF10B981),
-                            ),
+                          const SizedBox(height: 2),
+                          Text(
+                            extraBunksSum > 0 ? '$extraBunksSum simulated skip' : 'Available to bunk',
+                            style: TextStyle(fontSize: 10, color: extraBunksSum > 0 ? const Color(0xFFFBBF24) : Colors.grey[400]),
                           ),
                         ],
                       ),
-                      Text(
-                        'available',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.grey[400],
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
+                ],
               ),
             ],
           ),
@@ -433,7 +457,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         const SizedBox(height: 16),
 
-        // Next Class Card (As in Mockup 1)
+        // Next Class Card
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
@@ -517,23 +541,51 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const SizedBox(height: 20),
 
         // What-If Bunk Simulator Header
-        const Text(
-          'What-If Bunk Simulator',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w800,
-            color: Colors.white,
-            letterSpacing: -0.3,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Slide to see how skipping lectures impacts your %',
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            color: Colors.grey[400],
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'What-If Bunk Simulator',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Slide to test missing classes live',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey[400],
+                  ),
+                ),
+              ],
+            ),
+            if (extraBunksSum > 0)
+              GestureDetector(
+                onTap: () {
+                  HapticFeedback.mediumImpact();
+                  setState(() => _simulatedBunks.clear());
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E293B),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Text(
+                    'Reset',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF38BDF8)),
+                  ),
+                ),
+              ),
+          ],
         ),
         const SizedBox(height: 12),
 
@@ -655,13 +707,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // --- Tab 2: Timeline Schedule Tab (Mockup 2) ---
+  // --- Tab 2: Timeline Schedule Tab ---
   Widget _buildTimelineTab(AttendanceReport r) {
     return ListView(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       children: [
-        // Header with status banner
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.center,
@@ -707,7 +758,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Timeline indicator column (Line + Dot)
                 Column(
                   children: [
                     Container(
@@ -738,7 +788,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                 const SizedBox(width: 14),
 
-                // Timeline Class Card
                 Expanded(
                   child: Container(
                     margin: const EdgeInsets.only(bottom: 16),
@@ -927,7 +976,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 }
 
-// Custom Painter for the Smooth Circular Radial Gauge (Mockup 1)
+// Custom Painter for the Smooth Circular Radial Gauge with Padding Protection
 class _RadialGaugePainter extends CustomPainter {
   final double percentage;
   _RadialGaugePainter({required this.percentage});
@@ -935,7 +984,8 @@ class _RadialGaugePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = (size.width - 24) / 2;
+    // 16px safety inset to prevent stroke clipping
+    final radius = (size.width - 32) / 2;
 
     // Background track ring
     final bgPaint = Paint()
@@ -946,19 +996,22 @@ class _RadialGaugePainter extends CustomPainter {
 
     canvas.drawCircle(center, radius, bgPaint);
 
+    final isSafe = percentage >= 75.0;
+
     // Active progress arc with smooth gradient
     final progressPaint = Paint()
-      ..shader = const SweepGradient(
-        colors: [Color(0xFF059669), Color(0xFF10B981), Color(0xFF34D399), Color(0xFF06B6D4)],
-        stops: [0.0, 0.4, 0.7, 1.0],
+      ..shader = SweepGradient(
+        colors: isSafe
+            ? [const Color(0xFF059669), const Color(0xFF10B981), const Color(0xFF34D399), const Color(0xFF06B6D4)]
+            : [const Color(0xFFDC2626), const Color(0xFFEF4444), const Color(0xFFF87171), const Color(0xFFFBBF24)],
+        stops: const [0.0, 0.4, 0.7, 1.0],
       ).createShader(Rect.fromCircle(center: center, radius: radius))
       ..strokeWidth = 14
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
 
-    // Sweep angle based on percentage
     const startAngle = -pi / 2;
-    final sweepAngle = (percentage / 100) * 2 * pi * 0.95; // slight gap as in image
+    final sweepAngle = ((percentage.clamp(0.0, 100.0)) / 100) * 2 * pi * 0.95;
 
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
@@ -970,5 +1023,6 @@ class _RadialGaugePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+  bool shouldRepaint(covariant _RadialGaugePainter oldDelegate) =>
+      oldDelegate.percentage != percentage;
 }
