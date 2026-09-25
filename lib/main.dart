@@ -1,12 +1,11 @@
-import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'models/attendance_model.dart';
-import 'screens/login_screen.dart';
-import 'services/auth_service.dart';
 import 'services/scraper_service.dart';
+import 'services/dynamic_timetable_service.dart';
+import 'screens/tcs_webview_sync_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,45 +36,8 @@ class PoornimaBunkApp extends StatelessWidget {
           surface: Color(0xFF0E131F),
         ),
       ),
-      home: const AppRouter(),
+      home: const DashboardScreen(),
     );
-  }
-}
-
-class AppRouter extends StatefulWidget {
-  const AppRouter({super.key});
-  @override
-  State<AppRouter> createState() => _AppRouterState();
-}
-
-class _AppRouterState extends State<AppRouter> {
-  bool _isLoggedIn = false;
-  bool _checking = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _checkAuth();
-  }
-
-  Future<void> _checkAuth() async {
-    final creds = await AuthService.loadCredentials();
-    setState(() {
-      _isLoggedIn = creds != null;
-      _checking = false;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_checking) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator(color: Color(0xFF10B981))),
-      );
-    }
-    return _isLoggedIn
-        ? const DashboardScreen()
-        : LoginScreen(onLoginSuccess: () => setState(() => _isLoggedIn = true));
   }
 }
 
@@ -89,72 +51,62 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _currentTabIndex = 0;
   AttendanceReport? _report;
   bool _isLoading = true;
-  bool _isSyncing = false;
+  bool _isLiveSync = false;
   final Map<String, int> _simulatedBunks = {};
-
-  final _fallbackReport = AttendanceReport(
-    appName: 'Poornima Bunk Calculator',
-    developer: 'Crafted with precision by Gourav Singh (cyber)',
-    studentName: 'Gaurav',
-    program: 'B.Tech CY • PCE (Sem 1)',
-    overallTotal: 72, overallPresent: 69, overallAbsent: 3,
-    overallPercentage: 95.8, totalSafeBunks: 20,
-    bunkAdvice: 'You can safely miss up to 20 class(es) and remain comfortably above 75%.',
-    isTcsDown: false, lastSyncedAt: '24-Sep-2026 23:30', date: 'Today, 24 Sep',
-    subjects: [
-      Subject(code: 'PC261FY405', name: 'Human Values and Ethics', total: 10, present: 10, absent: 0, percentage: 100.0, safeBunks: 3, needToAttend: 0),
-      Subject(code: 'PC261CY104', name: 'Basic Electrical & Electronics', total: 9, present: 7, absent: 2, percentage: 77.8, safeBunks: 0, needToAttend: 0),
-      Subject(code: 'PC261FY103', name: 'Engineering Mathematics-I', total: 12, present: 12, absent: 0, percentage: 100.0, safeBunks: 4, needToAttend: 0),
-      Subject(code: 'PC261CY124', name: 'Web Programming Lab', total: 6, present: 6, absent: 0, percentage: 100.0, safeBunks: 2, needToAttend: 0),
-      Subject(code: 'PC261FY102', name: 'Engineering Physics', total: 6, present: 5, absent: 1, percentage: 83.3, safeBunks: 0, needToAttend: 0),
-      Subject(code: 'PC261FY106', name: 'Programming with C', total: 3, present: 3, absent: 0, percentage: 100.0, safeBunks: 1, needToAttend: 0),
-      Subject(code: 'NSP001', name: 'Non Syllabus Project', total: 6, present: 6, absent: 0, percentage: 100.0, safeBunks: 2, needToAttend: 0),
-      Subject(code: 'PC261FY122', name: 'Engineering Physics Lab', total: 4, present: 4, absent: 0, percentage: 100.0, safeBunks: 1, needToAttend: 0),
-      Subject(code: 'PC261FY123', name: 'Programming with C Lab', total: 2, present: 2, absent: 0, percentage: 100.0, safeBunks: 0, needToAttend: 0),
-      Subject(code: 'PC261FY526', name: 'Language Lab*', total: 6, present: 6, absent: 0, percentage: 100.0, safeBunks: 2, needToAttend: 0),
-      Subject(code: 'PC261FY628', name: 'IDEA Lab Workshop', total: 2, present: 2, absent: 0, percentage: 100.0, safeBunks: 0, needToAttend: 0),
-      Subject(code: 'PC261FY629', name: 'Manufacturing Practices Workshop', total: 6, present: 6, absent: 0, percentage: 100.0, safeBunks: 2, needToAttend: 0),
-    ],
-    todaySchedule: [
-      PeriodSlot(subject: 'Human Values and Ethics', timeSlot: '08:00 AM', status: 'Present'),
-      PeriodSlot(subject: 'Basic Electrical Engineering', timeSlot: '09:00 AM', status: 'Present'),
-      PeriodSlot(subject: 'Engineering Mathematics-I', timeSlot: '10:00 AM', status: 'In Progress'),
-      PeriodSlot(subject: 'Human Values and Ethics', timeSlot: '11:00 AM', status: 'Pending'),
-      PeriodSlot(subject: 'Web Programming Lab', timeSlot: '12:50 PM', status: 'Pending'),
-      PeriodSlot(subject: 'Web Programming Lab', timeSlot: '01:50 PM', status: 'Pending'),
-    ],
-  );
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _loadInitialData();
   }
 
-  Future<void> _loadData() async {
-    setState(() => _isLoading = true);
-    final scraped = await ScraperService.fetchAttendance();
+  Future<void> _loadInitialData() async {
+    final report = await ScraperService.loadData();
     setState(() {
-      if (scraped != null && scraped.overallTotal > 0) {
-        _report = scraped;
-      } else {
-        _report = _fallbackReport;
-      }
+      _report = report;
       _isLoading = false;
     });
   }
 
-  Future<void> _syncNow() async {
-    setState(() => _isSyncing = true);
+  void _openSyncWebView() {
     HapticFeedback.mediumImpact();
-    final scraped = await ScraperService.fetchAttendance();
-    setState(() {
-      if (scraped != null && scraped.overallTotal > 0) {
-        _report = scraped;
-      }
-      _isSyncing = false;
-    });
-    HapticFeedback.lightImpact();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => TcsWebviewSyncScreen(
+          onSyncSuccess: (newReport) {
+            setState(() {
+              _report = newReport;
+              _isLiveSync = true;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Attendance synchronized with TCS iON!'),
+                backgroundColor: Color(0xFF10B981),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _markClassAttendance(String subjectName, bool attended) async {
+    if (_report == null) return;
+    HapticFeedback.mediumImpact();
+    final updated = await ScraperService.recordClass(
+      current: _report!,
+      subjectName: subjectName,
+      wasAttended: attended,
+    );
+    setState(() => _report = updated);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(attended ? 'Marked Attended: $subjectName (+1)' : 'Marked Bunked: $subjectName'),
+        backgroundColor: attended ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   @override
@@ -172,17 +124,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Top App Bar
             _buildCustomHeader(r),
-
-            // Main Body Content
             Expanded(
-              child: _currentTabIndex == 0
-                  ? _buildOverviewTab(r)
-                  : _buildTimelineTab(r),
+              child: IndexedStack(
+                index: _currentTabIndex,
+                children: [
+                  _buildOverviewTab(r),
+                  _buildTimelineTab(r),
+                  _buildAnalyticsTab(r),
+                  _buildProfileTab(r),
+                ],
+              ),
             ),
-
-            // Bottom Navigation Bar
             _buildBottomNav(),
           ],
         ),
@@ -190,7 +143,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // --- Top Custom Header ---
+  // --- Top Header ---
   Widget _buildCustomHeader(AttendanceReport r) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -249,52 +202,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ],
           ),
-          // Live status pill
+          // Dynamic status pill
           GestureDetector(
-            onTap: _syncNow,
+            onTap: _openSyncWebView,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: const Color(0xFF064E3B).withOpacity(0.4),
+                color: _isLiveSync
+                    ? const Color(0xFF064E3B).withOpacity(0.4)
+                    : const Color(0xFF271B11).withOpacity(0.6),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: const Color(0xFF10B981).withOpacity(0.35),
+                  color: _isLiveSync
+                      ? const Color(0xFF10B981).withOpacity(0.35)
+                      : const Color(0xFFF59E0B).withOpacity(0.35),
                   width: 1,
                 ),
               ),
               child: Row(
                 children: [
-                  _isSyncing
-                      ? const SizedBox(
-                          width: 8,
-                          height: 8,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 1.5,
-                            color: Color(0xFF10B981),
-                          ),
-                        )
-                      : Container(
-                          width: 7,
-                          height: 7,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF10B981),
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Color(0xFF10B981),
-                                blurRadius: 6,
-                                spreadRadius: 1,
-                              )
-                            ],
-                          ),
-                        ),
+                  Container(
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      color: _isLiveSync ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
                   const SizedBox(width: 7),
-                  const Text(
-                    'TCS iON: Live',
+                  Text(
+                    _isLiveSync ? 'TCS iON: Synced' : 'Offline Mode',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF34D399),
+                      color: _isLiveSync ? const Color(0xFF34D399) : const Color(0xFFFBBF24),
                     ),
                   ),
                 ],
@@ -306,74 +247,58 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // --- Tab 1: Overview Tab (With Fixed Layout & Live Dynamic Math) ---
+  // --- Tab 0: Overview Dashboard ---
   Widget _buildOverviewTab(AttendanceReport r) {
-    // Dynamic recalculation driven by the sliders
     int extraBunksSum = 0;
-    for (final v in _simulatedBunks.values) {
-      extraBunksSum += v;
-    }
+    _simulatedBunks.forEach((_, count) => extraBunksSum += count);
 
-    final simTotalLectures = r.overallTotal + extraBunksSum;
-    final simPresentLectures = r.overallPresent;
-    final liveMasterPct = simTotalLectures > 0
-        ? double.parse(((simPresentLectures / simTotalLectures) * 100).toStringAsFixed(1))
-        : 0.0;
-    final liveSafeBunksRemaining = max(0, r.totalSafeBunks - extraBunksSum);
-    final isMasterSafe = liveMasterPct >= 75.0;
+    final displayTotal = r.overallTotal + extraBunksSum;
+    final displayPresent = r.overallPresent;
+    final displayPct = displayTotal > 0 ? (displayPresent / displayTotal) * 100 : 0.0;
+    final displaySafeBunks = max(0, ((displayPresent - 0.75 * displayTotal) / 0.75).floor());
+    final isSafe = displayPct >= 75.0;
 
     return ListView(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       children: [
-        const SizedBox(height: 10),
-
-        // Hero Card: Dedicated Non-Clipping Layout
+        // Main Radial Gauge Card
         Container(
           padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
           decoration: BoxDecoration(
             color: const Color(0xFF0C101A),
             borderRadius: BorderRadius.circular(28),
-            border: Border.all(
-              color: isMasterSafe ? const Color(0xFF1A2234) : const Color(0xFFEF4444).withOpacity(0.5),
-              width: 1.2,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.5),
-                blurRadius: 24,
-                offset: const Offset(0, 8),
-              ),
-            ],
+            border: Border.all(color: const Color(0xFF1A2234), width: 1.2),
           ),
           child: Column(
             children: [
-              // Clean Centered Radial Progress Ring (No crop, full stroke clearance)
               SizedBox(
-                width: 210,
-                height: 210,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    CustomPaint(
-                      size: const Size(210, 210),
-                      painter: _RadialGaugePainter(percentage: liveMasterPct),
-                    ),
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
+                width: 200,
+                height: 200,
+                child: CustomPaint(
+                  painter: _RadialGaugePainter(percentage: displayPct),
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          '${liveMasterPct.toStringAsFixed(1)}%',
+                          '${displayPct.toStringAsFixed(1)}%',
                           style: TextStyle(
-                            fontSize: 44,
+                            fontSize: 42,
                             fontWeight: FontWeight.w900,
-                            color: isMasterSafe ? Colors.white : const Color(0xFFEF4444),
+                            color: Colors.white,
                             letterSpacing: -1.5,
+                            shadows: [
+                              Shadow(
+                                color: (isSafe ? const Color(0xFF10B981) : const Color(0xFFEF4444)).withOpacity(0.4),
+                                blurRadius: 18,
+                              )
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 6),
                         Text(
-                          '$simPresentLectures / $simTotalLectures Lectures',
+                          '$displayPresent / $displayTotal Lectures',
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -382,69 +307,55 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
               ),
-
-              const SizedBox(height: 20),
-
-              // Embedded Dual Stat Bar: Lectures + Live Dynamic Bunk Wallet
+              const SizedBox(height: 24),
               Row(
                 children: [
                   Expanded(
                     child: Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF131A2B),
+                        color: const Color(0xFF0F172A),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFF26334D)),
+                        border: Border.all(color: const Color(0xFF1E293B)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('STATUS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.grey[400])),
+                          Text('STATUS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.grey[500])),
                           const SizedBox(height: 4),
                           Text(
-                            isMasterSafe ? 'SAFE' : 'CRITICAL',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w900,
-                              color: isMasterSafe ? const Color(0xFF10B981) : const Color(0xFFEF4444),
-                            ),
+                            isSafe ? 'SAFE' : 'CRITICAL',
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: isSafe ? const Color(0xFF10B981) : const Color(0xFFEF4444)),
                           ),
                           const SizedBox(height: 2),
-                          Text('Above 75% goal', style: TextStyle(fontSize: 10, color: Colors.grey[400])),
+                          Text(isSafe ? 'Above 75% goal' : 'Below minimum', style: TextStyle(fontSize: 11, color: Colors.grey[400])),
                         ],
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF131A2B),
+                        color: const Color(0xFF0F172A),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFF26334D)),
+                        border: Border.all(color: const Color(0xFF1E293B)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('BUNK WALLET', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.grey[400])),
+                          Text('BUNK WALLET', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.grey[500])),
                           const SizedBox(height: 4),
                           Text(
-                            '+$liveSafeBunksRemaining Safe',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFF10B981),
-                            ),
+                            isSafe ? '+$displaySafeBunks Safe' : '0 Safe',
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: isSafe ? const Color(0xFF38BDF8) : const Color(0xFFEF4444)),
                           ),
                           const SizedBox(height: 2),
-                          Text(
-                            extraBunksSum > 0 ? '$extraBunksSum simulated skip' : 'Available to bunk',
-                            style: TextStyle(fontSize: 10, color: extraBunksSum > 0 ? const Color(0xFFFBBF24) : Colors.grey[400]),
-                          ),
+                          Text(isSafe ? 'Available to bunk' : 'Attend next classes', style: TextStyle(fontSize: 11, color: Colors.grey[400])),
                         ],
                       ),
                     ),
@@ -456,14 +367,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
 
         const SizedBox(height: 16),
-
-        // Dynamic Next Class Card based on real clock
-        _buildNextClassCard(r),
-
-
+        _buildDynamicNextClassCard(),
         const SizedBox(height: 20),
 
-        // What-If Bunk Simulator Header
+        // What-If Simulator Header
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -472,21 +379,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 const Text(
                   'What-If Bunk Simulator',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    letterSpacing: -0.3,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: -0.3),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'Slide to test missing classes live',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.grey[400],
-                  ),
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.grey[400]),
                 ),
               ],
             ),
@@ -498,21 +396,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 },
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1E293B),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Text(
-                    'Reset',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF38BDF8)),
-                  ),
+                  decoration: BoxDecoration(color: const Color(0xFF1E293B), borderRadius: BorderRadius.circular(10)),
+                  child: const Text('Reset', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF38BDF8))),
                 ),
               ),
           ],
         ),
         const SizedBox(height: 12),
 
-        // Subject Simulator Cards
         ...r.subjects.map((sub) {
           final extra = _simulatedBunks[sub.code] ?? 0;
           final simTotal = sub.total + extra;
@@ -536,41 +427,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            sub.name,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
-                          ),
+                          Text(sub.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white)),
                           const SizedBox(height: 2),
-                          Text(
-                            sub.code,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey[500],
-                              fontFamily: 'monospace',
-                            ),
-                          ),
+                          Text(sub.code, style: TextStyle(fontSize: 11, color: Colors.grey[500], fontFamily: 'monospace')),
                         ],
                       ),
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: safe
-                            ? const Color(0xFF10B981).withOpacity(0.12)
-                            : const Color(0xFFEF4444).withOpacity(0.12),
+                        color: safe ? const Color(0xFF10B981).withOpacity(0.12) : const Color(0xFFEF4444).withOpacity(0.12),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
                         '${simPct.toStringAsFixed(1)}%',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                          color: safe ? const Color(0xFF10B981) : const Color(0xFFEF4444),
-                        ),
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: safe ? const Color(0xFF10B981) : const Color(0xFFEF4444)),
                       ),
                     ),
                   ],
@@ -578,10 +449,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    Text(
-                      '+$extra skip',
-                      style: TextStyle(fontSize: 11, color: Colors.grey[400]),
-                    ),
+                    Text('+$extra skip', style: TextStyle(fontSize: 11, color: Colors.grey[400])),
                     Expanded(
                       child: SliderTheme(
                         data: SliderTheme.of(context).copyWith(
@@ -603,83 +471,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                       ),
                     ),
-                    Text(
-                      '+${sub.safeBunks} safe',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF10B981),
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
                   ],
                 ),
               ],
             ),
           );
         }),
-
-        const SizedBox(height: 24),
-        Center(
-          child: Text(
-            'Poornima Bunk Calculator • ${r.developer}',
-            style: TextStyle(fontSize: 11, color: Colors.grey[500], fontWeight: FontWeight.w500),
-          ),
-        ),
-        const SizedBox(height: 20),
       ],
     );
   }
 
-  // --- Dynamic Next Class Calculator (Time-Aware) ---
-  Widget _buildNextClassCard(AttendanceReport r) {
-    final now = DateTime.now();
-    final currentHour = now.hour;
-    final currentMinute = now.minute;
-    final currentTimeInMinutes = currentHour * 60 + currentMinute;
-
-    // College schedule slots mapped to minutes from midnight
-    // 08:00 (480) - 09:00 (540): Human Values
-    // 09:00 (540) - 10:00 (600): Basic Electrical
-    // 10:00 (600) - 11:00 (660): Engineering Maths-I
-    // 11:00 (660) - 12:00 (720): Human Values
-    // 12:50 (770) - 13:50 (830): Web Programming Lab
-    // 13:50 (830) - 14:50 (890): Web Programming Lab
-
-    String cardHeader;
-    String badgeText;
-    Color badgeColor;
-    String subjectName;
-    String slotInfo;
-    String timeSlot;
-
-    if (currentTimeInMinutes < 480) {
-      // Early morning / Night (e.g. 12:52 AM)
-      final minsUntilStart = 480 - currentTimeInMinutes;
-      final hoursUntil = minsUntilStart ~/ 60;
-      final minsRemaining = minsUntilStart % 60;
-      cardHeader = 'First Class Today';
-      badgeText = hoursUntil > 0 ? 'Starts in ${hoursUntil}h ${minsRemaining}m' : 'Starts in ${minsRemaining}m';
-      badgeColor = const Color(0xFF38BDF8);
-      subjectName = 'Human Values and Ethics';
-      slotInfo = 'Room #201 • Theory';
-      timeSlot = '08:00 AM';
-    } else if (currentTimeInMinutes >= 890) {
-      // Classes over for the day (after 2:50 PM)
-      cardHeader = 'All Classes Done';
-      badgeText = 'Day Complete';
-      badgeColor = const Color(0xFF10B981);
-      subjectName = 'No more lectures today';
-      slotInfo = 'College day complete';
-      timeSlot = 'Tomorrow';
-    } else {
-      // Active college hours
-      cardHeader = 'Next Class';
-      badgeText = 'Active Day';
-      badgeColor = const Color(0xFFFBBF24);
-      subjectName = 'Engineering Mathematics-I';
-      slotInfo = 'Room #3043 • Theory';
-      timeSlot = 'In Session';
-    }
+  // --- Dynamic Next Class Card ---
+  Widget _buildDynamicNextClassCard() {
+    final nextInfo = DynamicTimetableService.getNextClassOverview();
+    final badgeColor = nextInfo.isCompleted ? const Color(0xFF10B981) : const Color(0xFF38BDF8);
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -695,12 +500,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                cardHeader,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey[400],
-                ),
+                nextInfo.cardHeader,
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.grey[400]),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
@@ -709,12 +510,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  badgeText,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: badgeColor,
-                  ),
+                  nextInfo.badgeText,
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: badgeColor),
                 ),
               ),
             ],
@@ -729,33 +526,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      subjectName,
-                      style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                        letterSpacing: -0.4,
-                      ),
+                      nextInfo.subjectName,
+                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: -0.4),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      slotInfo,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.grey[400],
-                      ),
+                      nextInfo.slotInfo,
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.grey[400]),
                     ),
                   ],
                 ),
               ),
               Text(
-                timeSlot,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white70,
-                ),
+                nextInfo.timeSlot,
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Colors.white70),
               ),
             ],
           ),
@@ -764,11 +548,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // --- Tab 2: Timeline Schedule Tab ---
+  // --- Tab 1: Timeline Schedule Tab ---
   Widget _buildTimelineTab(AttendanceReport r) {
     final now = DateTime.now();
     const months = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     final dynamicDateStr = 'Today, ${now.day} ${months[now.month]}';
+    final periods = DynamicTimetableService.getDynamicPeriodsForToday();
 
     return ListView(
       physics: const BouncingScrollPhysics(),
@@ -780,40 +565,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             Text(
               dynamicDateStr,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
-                color: Colors.white,
-                letterSpacing: -0.5,
-              ),
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -0.5),
             ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
-                color: const Color(0xFF271B11),
+                color: const Color(0xFF0F172A),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFF78350F), width: 1),
+                border: Border.all(color: const Color(0xFF1E293B)),
               ),
-              child: const Text(
-                'Showing offline data',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFFFBBF24),
-                ),
+              child: Text(
+                '${periods.length} Periods',
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF38BDF8)),
               ),
             ),
           ],
         ),
-
         const SizedBox(height: 24),
 
-        // Vertical Connected Timeline List
-        ...List.generate(r.todaySchedule.length, (index) {
-          final slot = r.todaySchedule[index];
-          final isLast = index == r.todaySchedule.length - 1;
+        ...List.generate(periods.length, (index) {
+          final slot = periods[index];
+          final isLast = index == periods.length - 1;
           final isInProgress = slot.status == 'In Progress';
-          final isPresent = slot.status == 'Present';
+          final isCompleted = slot.status == 'Completed';
 
           return IntrinsicHeight(
             child: Row(
@@ -826,27 +600,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       height: 18,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: isInProgress
-                            ? const Color(0xFF0A192F)
-                            : const Color(0xFF0F172A),
+                        color: isInProgress ? const Color(0xFF0A192F) : const Color(0xFF0F172A),
                         border: Border.all(
                           color: isInProgress
                               ? const Color(0xFF38BDF8)
-                              : (isPresent ? const Color(0xFF10B981) : const Color(0xFF334155)),
+                              : (isCompleted ? const Color(0xFF10B981) : const Color(0xFF334155)),
                           width: isInProgress ? 4 : 2,
                         ),
                       ),
                     ),
                     if (!isLast)
                       Expanded(
-                        child: Container(
-                          width: 2,
-                          color: const Color(0xFF1E293B),
-                        ),
+                        child: Container(width: 2, color: const Color(0xFF1E293B)),
                       ),
                   ],
                 ),
-
                 const SizedBox(width: 14),
 
                 Expanded(
@@ -857,116 +625,73 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       color: const Color(0xFF0C101A),
                       borderRadius: BorderRadius.circular(18),
                       border: Border.all(
-                        color: isInProgress
-                            ? const Color(0xFF0284C7)
-                            : const Color(0xFF1A2234),
+                        color: isInProgress ? const Color(0xFF0284C7) : const Color(0xFF1A2234),
                         width: isInProgress ? 1.8 : 1,
                       ),
-                      boxShadow: isInProgress
-                          ? [
-                              BoxShadow(
-                                color: const Color(0xFF0284C7).withOpacity(0.2),
-                                blurRadius: 16,
-                                spreadRadius: 1,
-                              )
-                            ]
-                          : null,
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          slot.timeSlot,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey[400],
-                          ),
-                        ),
+                        Text(slot.timeSlot, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[400])),
                         const SizedBox(height: 6),
-                        Text(
-                          slot.subject,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                          ),
-                        ),
+                        Text(slot.subject, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.white)),
                         const SizedBox(height: 12),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            if (isPresent)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF10B981).withOpacity(0.12),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.check_circle, size: 14, color: Color(0xFF10B981)),
-                                    SizedBox(width: 5),
-                                    Text(
-                                      'Present',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w800,
-                                        color: Color(0xFF10B981),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              )
-                            else if (isInProgress)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF0284C7).withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Text(
-                                  'In Progress',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFF38BDF8),
-                                  ),
-                                ),
-                              )
-                            else
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF1E293B),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  'Pending',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.grey[400],
-                                  ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: isInProgress
+                                    ? const Color(0xFF0284C7).withOpacity(0.2)
+                                    : (isCompleted
+                                        ? const Color(0xFF10B981).withOpacity(0.12)
+                                        : const Color(0xFF1E293B)),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                slot.status,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: isInProgress
+                                      ? const Color(0xFF38BDF8)
+                                      : (isCompleted ? const Color(0xFF10B981) : Colors.grey[400]),
                                 ),
                               ),
-
-                            if (!isPresent && !isInProgress)
-                              Row(
-                                children: [
-                                  Icon(Icons.access_time, size: 12, color: Colors.grey[500]),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Next sync: 1:55 PM',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w500,
-                                      color: Colors.grey[400],
+                            ),
+                            // Quick Action Buttons
+                            Row(
+                              children: [
+                                InkWell(
+                                  onTap: () => _markClassAttendance(slot.subject, true),
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF064E3B).withOpacity(0.4),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: const Color(0xFF10B981).withOpacity(0.4)),
                                     ),
+                                    child: const Text('+ Attended', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF34D399))),
                                   ),
-                                ],
-                              ),
+                                ),
+                                const SizedBox(width: 6),
+                                InkWell(
+                                  onTap: () => _markClassAttendance(slot.subject, false),
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF7F1D1D).withOpacity(0.4),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.4)),
+                                    ),
+                                    child: const Text('- Bunked', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFFF87171))),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ],
                         ),
                       ],
@@ -977,6 +702,203 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           );
         }),
+      ],
+    );
+  }
+
+  // --- Tab 2: Analytics Tab ---
+  Widget _buildAnalyticsTab(AttendanceReport r) {
+    final dangerSubjects = r.subjects.where((s) => s.percentage < 80.0).toList();
+    final sortedByBuffer = List<Subject>.from(r.subjects)..sort((a, b) => b.safeBunks.compareTo(a.safeBunks));
+
+    return ListView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      children: [
+        const Text(
+          'Attendance Analytics',
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -0.5),
+        ),
+        const SizedBox(height: 6),
+        Text('In-depth breakdown of your academic standing', style: TextStyle(fontSize: 13, color: Colors.grey[400])),
+        const SizedBox(height: 20),
+
+        if (dangerSubjects.isNotEmpty) ...[
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF271B11),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFF78350F)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded, color: Color(0xFFFBBF24), size: 18),
+                    SizedBox(width: 8),
+                    Text('Danger Zone Alert (<80%)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFFFBBF24))),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${dangerSubjects.first.name} is currently at ${dangerSubjects.first.percentage}%. Avoid missing this subject.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[300]),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
+
+        const Text('Highest Bunk Buffer Ranking', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.white)),
+        const SizedBox(height: 12),
+
+        ...sortedByBuffer.take(5).map((s) => Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0C101A),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFF1A2234)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(s.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white)),
+                    const SizedBox(height: 2),
+                    Text('${s.present}/${s.total} Lectures Attended (${s.percentage}%)', style: TextStyle(fontSize: 11, color: Colors.grey[400])),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0284C7).withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text('+${s.safeBunks} safe', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF38BDF8))),
+              ),
+            ],
+          ),
+        )),
+      ],
+    );
+  }
+
+  // --- Tab 3: Profile & Settings Tab ---
+  Widget _buildProfileTab(AttendanceReport r) {
+    return ListView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      children: [
+        const Text(
+          'Student Profile & Sync',
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -0.5),
+        ),
+        const SizedBox(height: 20),
+
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0C101A),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFF1A2234)),
+          ),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFF1E293B),
+                      border: Border.all(color: const Color(0xFF334155), width: 1.5),
+                    ),
+                    child: const Center(
+                      child: Text('GS', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white)),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(r.studentName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white)),
+                      const SizedBox(height: 3),
+                      Text(r.program, style: TextStyle(fontSize: 12, color: Colors.grey[400])),
+                      const SizedBox(height: 2),
+                      const Text('Poornima College of Engineering (9253)', style: TextStyle(fontSize: 11, color: Color(0xFF10B981))),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              const Divider(color: Color(0xFF1A2234)),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Last Synced', style: TextStyle(fontSize: 12, color: Colors.grey[400])),
+                  Text(r.lastSyncedAt, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 20),
+
+        // Sync Trigger Button
+        ElevatedButton.icon(
+          onPressed: _openSyncWebView,
+          icon: const Icon(Icons.sync_rounded, color: Colors.black),
+          label: const Text('Sync with TCS iON Portal', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Colors.black)),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF10B981),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        // Reset Baseline Button
+        OutlinedButton.icon(
+          onPressed: () async {
+            HapticFeedback.mediumImpact();
+            final reset = await ScraperService.resetToBaseline();
+            setState(() {
+              _report = reset;
+              _simulatedBunks.clear();
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Reset to verified college baseline (72 lectures, 95.8%)')),
+            );
+          },
+          icon: const Icon(Icons.restore_rounded, color: Colors.grey, size: 18),
+          label: const Text('Reset Attendance Records', style: TextStyle(color: Colors.grey)),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            side: const BorderSide(color: Color(0xFF1A2234)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          ),
+        ),
+
+        const SizedBox(height: 28),
+        Center(
+          child: Text(
+            r.developer,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+          ),
+        ),
       ],
     );
   }
@@ -1006,9 +928,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return GestureDetector(
       onTap: () {
         HapticFeedback.selectionClick();
-        if (index <= 1) {
-          setState(() => _currentTabIndex = index);
-        }
+        setState(() => _currentTabIndex = index);
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -1045,10 +965,8 @@ class _RadialGaugePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    // 16px safety inset to prevent stroke clipping
     final radius = (size.width - 32) / 2;
 
-    // Background track ring
     final bgPaint = Paint()
       ..color = const Color(0xFF141C2E)
       ..strokeWidth = 14
@@ -1059,7 +977,6 @@ class _RadialGaugePainter extends CustomPainter {
 
     final isSafe = percentage >= 75.0;
 
-    // Active progress arc with smooth gradient
     final progressPaint = Paint()
       ..shader = SweepGradient(
         colors: isSafe
