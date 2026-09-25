@@ -52,6 +52,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   AttendanceReport? _report;
   bool _isLoading = true;
   bool _isLiveSync = false;
+  bool _hasSyncFailed = false;
+  String? _syncError;
   final Map<String, int> _simulatedBunks = {};
 
   @override
@@ -78,6 +80,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             setState(() {
               _report = newReport;
               _isLiveSync = true;
+              _hasSyncFailed = false;
+              _syncError = null;
             });
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -85,6 +89,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 backgroundColor: Color(0xFF10B981),
               ),
             );
+          },
+          onSyncFailure: (errorReason) {
+            setState(() {
+              _hasSyncFailed = true;
+              _syncError = errorReason;
+              _isLiveSync = false;
+            });
           },
         ),
       ),
@@ -208,14 +219,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: _isLiveSync
-                    ? const Color(0xFF064E3B).withOpacity(0.4)
-                    : const Color(0xFF271B11).withOpacity(0.6),
+                color: _hasSyncFailed
+                    ? const Color(0xFF2A1215).withOpacity(0.8)
+                    : (_isLiveSync
+                        ? const Color(0xFF064E3B).withOpacity(0.4)
+                        : const Color(0xFF271B11).withOpacity(0.6)),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: _isLiveSync
-                      ? const Color(0xFF10B981).withOpacity(0.35)
-                      : const Color(0xFFF59E0B).withOpacity(0.35),
+                  color: _hasSyncFailed
+                      ? const Color(0xFFEF4444).withOpacity(0.5)
+                      : (_isLiveSync
+                          ? const Color(0xFF10B981).withOpacity(0.35)
+                          : const Color(0xFFF59E0B).withOpacity(0.35)),
                   width: 1,
                 ),
               ),
@@ -225,17 +240,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     width: 7,
                     height: 7,
                     decoration: BoxDecoration(
-                      color: _isLiveSync ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                      color: _hasSyncFailed
+                          ? const Color(0xFFEF4444)
+                          : (_isLiveSync ? const Color(0xFF10B981) : const Color(0xFFF59E0B)),
                       shape: BoxShape.circle,
                     ),
                   ),
                   const SizedBox(width: 7),
                   Text(
-                    _isLiveSync ? 'TCS iON: Synced' : 'Offline Mode',
+                    _hasSyncFailed
+                        ? 'Sync Failed'
+                        : (_isLiveSync ? 'TCS iON: Synced' : 'Offline Mode'),
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      color: _isLiveSync ? const Color(0xFF34D399) : const Color(0xFFFBBF24),
+                      color: _hasSyncFailed
+                          ? const Color(0xFFF87171)
+                          : (_isLiveSync ? const Color(0xFF34D399) : const Color(0xFFFBBF24)),
                     ),
                   ),
                 ],
@@ -262,6 +283,91 @@ class _DashboardScreenState extends State<DashboardScreen> {
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       children: [
+        // Sync Failure Alert Banner
+        if (_hasSyncFailed && _syncError != null) ...[
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E1014),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.4), width: 1.2),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEF4444).withOpacity(0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.sync_problem_rounded, color: Color(0xFFF87171), size: 22),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'TCS iON Sync Failed',
+                        style: TextStyle(
+                          color: Color(0xFFF87171),
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _syncError!,
+                        style: TextStyle(
+                          color: Colors.grey[300],
+                          fontSize: 12,
+                          height: 1.3,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      InkWell(
+                        onTap: _openSyncWebView,
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2E171B),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.3)),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.refresh_rounded, size: 14, color: Color(0xFFFCA5A5)),
+                              SizedBox(width: 6),
+                              Text(
+                                'Retry Connection',
+                                style: TextStyle(
+                                  color: Color(0xFFFCA5A5),
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, size: 18, color: Colors.grey),
+                  onPressed: () => setState(() => _hasSyncFailed = false),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+
         // Main Radial Gauge Card
         Container(
           padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
